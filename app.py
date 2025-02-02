@@ -1,7 +1,7 @@
 from flask import Flask, render_template, redirect, url_for, request, session, flash
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime
+from datetime import datetime, timezone
 import random
 import os
 import pymysql
@@ -25,6 +25,8 @@ class User(db.Model):
     
     # Track if the user has already guessed today
     has_guessed_today = db.Column(db.Boolean, default=False)  # Add this field
+    correct_number = db.Column(db.Integer, nullable=True)
+    last_guess_date = db.Column(db.DateTime, nullable=True)
 
     def set_password(self, password):
         self.password = generate_password_hash(password)
@@ -41,7 +43,7 @@ def home():
     print(f"DEBUG: Current Session Data - {session}")  # Debugging line
     
     if 'user_id' not in session:
-        flash("You are logged out. Please log in.", "warning")
+        # flash("You are logged out. Please log in.", "warning")
         return redirect(url_for('login'))
 
     user = User.query.get(session['user_id'])
@@ -115,7 +117,7 @@ def login():
 def logout():
     print(f"DEBUG: Logging out user {session.get('user_id')}")  # Debugging
     session.pop('user_id', None)  # Clear session
-    flash('You have been logged out.', 'info')
+    # flash('You have been logged out.', 'info')
     return redirect(url_for('home'))
 
 @app.route('/game')
@@ -128,14 +130,21 @@ def game():
 
     if user.has_guessed_today:
         flash("You have already guessed today. Your earnings: {0} coins.".format(user.coins), "info")
-        return render_template('game.html', user=user)
-
+        # return redirect(url_for('home'))
+    
     # Calculate the day and number range
-    days_played = (datetime.utcnow() - user.created_at).days + 1
+    days_played = (datetime.now(timezone.utc).date() - user.created_at.date()).days + 1
     number_range = 10 * days_played  # Increase range every day
-    correct_number = random.randint(1, number_range)
 
-    session['correct_number'] = correct_number  # Store correct number for validation
+    last_guess_date = user.last_guess_date if user.last_guess_date else datetime.now(timezone.utc)
+    print(last_guess_date)
+    # Reset correct_number if it's a new day
+    if user.correct_number is None or last_guess_date.date() < datetime.now(timezone.utc).date():
+        user.correct_number = random.randint(1, number_range)
+        user.has_guessed_today = False  # Allow guessing again
+        user.last_guess_date = datetime.now(timezone.utc)  # Update last played date
+        db.session.commit()
+
 
     return render_template('game.html', user=user, days_played=days_played, number_range=number_range)
 
@@ -150,21 +159,22 @@ def guess():
 
     if user.has_guessed_today:
         flash("You have already guessed today. Please wait until tomorrow to make a new guess.", "info")
-        return redirect(url_for('home'))
+        return redirect(url_for('game'))
+    
 
+    user.has_guessed_today = True
     days_played = (datetime.utcnow() - user.created_at).days + 1
-    correct_number = session.get('correct_number')  # Retrieve the correct number
+    correct_number = user.correct_number 
     guessed_number = int(request.form['guess'])
-
+    flash(f"Correct number was {correct_number} and you guesed {guessed_number}.")
     if guessed_number == correct_number:
         winnings = 0.1 * days_played  # Reward user based on days played
         user.coins += winnings
-        user.has_guessed_today = True  # Mark the user as having guessed today
         db.session.commit()  # Save changes to database
         flash(f"🎉 Correct! You won {winnings} coins! Again try tomorrow!!", "success")
     else:
-        user.has_guessed_today = True
         flash("❌ Incorrect guess. Try again tomorrow!", "error")
+    db.session.commit()
 
     return redirect(url_for('game'))
 
