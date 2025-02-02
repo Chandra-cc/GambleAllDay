@@ -4,12 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Home</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-    <h1>Welcome, {{ user.name }}</h1>
-    <p>Your coins: {{ user.coins }}</p>
-    <a href="{{ url_for('game') }}">Start Game</a>
-    <a href="{{ url_for('logout') }}">Logout</a>
+    <h1>Welcome {{ user.email }}</h1>
+    
+    <!-- Button to play game -->
+    <form action="{{ url_for('game') }}" method="get">
+        <button type="submit">Play Game</button>
+    </form>
 </body>
 </html>
