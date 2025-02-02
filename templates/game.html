@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game</title>
+</head>
+<body>
+    <h1>Day {{ day }}: Guess a number between 1 and {{ number_range }}</h1>
+    <form action="{{ url_for('guess') }}" method="POST">
+        <input type="number" name="guess" min="1" max="{{ number_range }}" required>
+        <button type="submit">Submit</button>
+    </form>
+</body>
+</html>
